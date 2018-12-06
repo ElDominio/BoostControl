@@ -23,7 +23,7 @@ unsigned int boostRPM[10];
 unsigned int dutyCycle[10];
 bool RPMcorrection = true;
 bool MAPcorrection = true;
-byte currentCell = 0;
+int currentCell = 0;
 
 //unsigned long pastTime = 0;
 unsigned long triggerTime = 4294967295;
@@ -33,8 +33,8 @@ long RPM;
 long RPMold;
 unsigned long times;
 unsigned long timeOld;
-byte rateOfChange = 0;
-byte timesOld = 0;
+int rateOfChange = 0;
+unsigned long timesOld = 0;
 
 
 
@@ -57,25 +57,26 @@ void loop() {
     boostInt = analogRead(boostRead);
     currentDC = DCcorrections(baseDC);
     MAPupdate = 0;
-    currentCell = map(RPM, boostRPM[0], boostRPM[9], 1, 9);
+    currentCell = map(RPM, boostRPM[0], boostRPM[9], 0, 9);
+    currentCell = constrain(currentCell, 0, 9);
     if(currentCell > 10){
-      currentCell = 0;
+      currentCell = 9;
     }
-    currentCell = constrain(currentCell, 1, 9);
+    
     currentBoostRPM = boostRPM[currentCell];
     baseDC = dutyCycle[currentCell];
     
     currentDC = DCcorrections(baseDC);
-    if ((millis()-timeOld) > 200){
+    if ((micros()-timeOld) > 191096){
       RPM = 0;
     }
   }
 /*if ((millis() - triggerTime) > 1000){
     attachInterrupt(digitalPinToInterrupt(3), triggerCounter, RISING);
   }*/
-  if(boostInt > 900){
-      while(boostInt > 400){
-        analogWrite(boostPin, 20);
+  if(boostInt > 945){
+      while(boostInt > 700){
+        analogWrite(boostPin, 70);
        boostInt = analogRead(boostRead);
        Serial.println("OVERBOOST!");
       }
@@ -137,83 +138,65 @@ void SerialComms(){
     while (i < 4){
       byte serialByte;
       int serialInt;
-      Serial.read();
-      if (Serial.available()){
+      Serial.println("main while");
+      //if (Serial.available()){
         while (i == 0){
-           serialByte = Serial.read();
-          if( serialByte == 59){
-            i++;
+          if (Serial.available()){
+            serialByte = Serial.read();
+            if( serialByte == 59){
+              i++;
+              break;
+            }
+            serialByte = serialByte - 48;
+            serialByte = constrain(serialByte, 0, 10);
+            currentCell = serialByte;
+            Serial.print("i = "); Serial.print(i);Serial.print(" ");Serial.println(currentCell);
+             /* String serialRead =Serial.readStringUntil(';');
+              byte serialInt = Serial.read();
+              if (serialInt > 10){ serialInt = 9;}
+              byte serialByte = serialInt;
+             // byte serialByte = Serial.read();
+            currentCell = serialByte;
+            Serial.print("i = "); Serial.print(i);Serial.print(" ");Serial.println(currentCell);
+            i++;*/
           }
-          serialByte = serialByte - 48;
-          serialByte = constrain(serialByte, 0, 10);
-          currentCell = serialByte;
-          Serial.print("i = "); Serial.print(i);Serial.print(" ");Serial.println(currentCell);
-           /* String serialRead =Serial.readStringUntil(';');
-            byte serialInt = Serial.read();
-            if (serialInt > 10){ serialInt = 9;}
-            byte serialByte = serialInt;
-           // byte serialByte = Serial.read();
-          currentCell = serialByte;
-          Serial.print("i = "); Serial.print(i);Serial.print(" ");Serial.println(currentCell);
-          i++;*/
         }
         while(i == 1){
-        //  if (Serial.available()){
-          serialByte = Serial.read();
-          if( serialByte == 59){
-            i++;
+                //Serial.println("main while3");
+         if (Serial.available() > 4){
+         byte readRPM[4];
+          for(int i = 0 ; i < 4; i++){
+            readRPM[i] = Serial.read() - 48;
+            //Serial.println(readRPM[i]);
           }
-          serialByte = serialByte - 48;
-          serialInt = serialByte*1000;
+          i++;
           serialByte = Serial.read();
-          serialInt = serialInt + serialByte*100;
-          serialByte = Serial.read();
-          serialInt = serialInt + serialByte*10;
-          serialByte = Serial.read();
-          serialInt = serialInt + serialByte;
-          currentBoostRPM = serialInt;
-            currentBoostRPM = constrain(currentBoostRPM, 0, 8000);
-            Serial.print("i = "); Serial.print(i);Serial.print(" ");Serial.println(currentBoostRPM);
-           /*String serialRead =Serial.readStringUntil(';');
-            int serialInt = serialRead.toInt();
-            
-            currentBoostRPM = serialInt;
-            currentBoostRPM = constrain(currentBoostRPM, 0, 8000);
-            Serial.print("i = "); Serial.print(i);Serial.print(" ");Serial.println(currentBoostRPM);
-            i++; // i = 2*/
-         //}
+          currentBoostRPM = readRPM[0]*1000 + readRPM[1]*100 + readRPM[2]*10 +readRPM[3];
+          currentBoostRPM = constrain(currentBoostRPM, 0, 8000);
+           Serial.print("i = "); Serial.print(i);Serial.print(" ");Serial.println(currentBoostRPM);
+
+         }
         }
         while ( i == 2 ){
-         // if (Serial.available()){
-          serialByte = Serial.read();
-          if( serialByte == 59){
-            i++;
+         if (Serial.available() > 2){
+         byte readDC[2];
+          for(int i = 0 ; i < 2; i++){
+            readDC[i] = Serial.read() - 48;
+            //Serial.println(readRPM[i]);
           }
-          serialByte = serialByte - 48;
-          serialInt = serialByte*100;
-          serialByte = Serial.read();
-          serialInt = serialInt + serialByte*10;
-          serialByte = Serial.read();
-          serialInt = serialInt + serialByte;
-          currentDC = serialInt;
+          i++;
+          //serialByte = Serial.read();
+          currentDC = readDC[0]*10 + readDC[1];
+          currentDC = constrain(currentDC, 0, 8000);
             currentDC = constrain(currentDC, 0, 100);
             currentDC = map(currentDC, 0, 100, 0, 255);
             Serial.print("i = "); Serial.print(i);Serial.print(" ");Serial.print(currentDC);
            Serial.print(" or in duty cycle: ");Serial.print(map(currentDC, 0, 255, 0, 100) + 1);Serial.print("%");
             Serial.println("");
-          /*
-            String serialRead =Serial.readStringUntil(';');
-            int serialInt = serialRead.toInt();            
-            currentDC = serialInt;
-            currentDC = constrain(currentDC, 0, 100);
-            currentDC = map(currentDC, 0, 100, 0, 255);
-            Serial.print("i = "); Serial.print(i);Serial.print(" ");Serial.print(currentDC);
-           Serial.print(" or in duty cycle: ");Serial.print(map(currentDC, 0, 255, 0, 100) + 1);Serial.print("%");
-            Serial.println("");
-            i++; // i == 3*/
-         // }
+         
+          }
         }// end elseif
-      }// end main serial available
+      //}// end main serial available
       if ( i == 3){
           Serial.print("i = "); Serial.print(i);Serial.print(" ");
           burnCalibration(currentCell, currentBoostRPM, currentDC);
@@ -302,13 +285,10 @@ void SerialComms(){
 
 
 byte DCcorrections(byte duty){
-  if(MAPcorrection){
-    if  (boostInt < 360){
-      duty = 200;
-    }
-  }
+  
   if(RPMcorrection){
     duty = map(RPM, boostRPM[currentCell-1], boostRPM[currentCell], dutyCycle[currentCell-1], dutyCycle[currentCell]);
+    duty = constrain(duty, 0, dutyCycle[7]);
     /*
     if ((RPM > 7000) && (RPM < 7699)){
       duty = duty + 1;
@@ -316,9 +296,21 @@ byte DCcorrections(byte duty){
     else if ((RPM > 7700) && (RPM < 8999)){
       duty = duty + 2;
     }*/
-   if (RPM < 2500){
+    if (RPM > boostRPM[9]){
+      duty = dutyCycle[9];
+    }
+   
+  if(MAPcorrection){
+    if  (boostInt < 260){
+      duty = 200;
+    }
+  }
+  if (RPM < 2500){
      duty = 0;
     }
+  }
+   if (rateOfChange < -500){
+    duty = 10;
   }
   return duty;
 }
@@ -330,6 +322,26 @@ void triggerCounter(){
   //Serial.println("TRIGGER");
 }
 
+void RPMcounter(){
+ // Serial.print("micros "); Serial.print(micros());Serial.print("timeOld ");Serial.println(timeOld);
+  timesOld = times;
+  times = micros()-timeOld;        //finds the time 
+  //Serial.print("Times: "); Serial.println(times);
+  RPM = (30108000/times);         //calculates rpm
+  RPM = RPM*(cylCount);
+  // Serial.println(RPM);
+ /* if ((RPM - RPMold) > 10000){
+    RPM = RPMold;
+  }*/
+  timeOld = micros();
+  if ((RPM > 0) && (RPM < 12000)){
+    RPMold = RPM;
+  }
+  //Serial.println(RPM);
+  trigCounter = 0;
+  rateOfChange = timesOld - times;
+}
+/*
 void RPMcounter(){
   
   if ((RPM > 0) && (RPM < 7000)){
@@ -345,9 +357,10 @@ void RPMcounter(){
   timeOld = millis();
   //Serial.println(" INTERRUPT!");
   trigCounter = 0;
-  rateOfChange = times - timesOld;
+  rateOfChange = timesOld - times;
+//  Serial.print(timesOld);Serial.print(" - ");Serial.print(times);Serial.print(" = ");Serial.println((rateOfChange));
   
-}
+}*/
 
 
 void SerialDiag(){
@@ -364,7 +377,7 @@ void SerialDiag(){
     }
     posRepFlag = false;
   }
-  else if((millis() - 1 % 250) == 0){
+  else if(((millis() - 1) % 250) == 0){
     posRepFlag = true;
   }
   //  positionReport = millis();
